@@ -63,11 +63,19 @@ class PI05Config(PreTrainedConfig):
 
     tokenizer_max_length: int = 200  # see openpi `__post_init__`
 
+    # normalization_mapping: dict[str, NormalizationMode] = field(
+    #     default_factory=lambda: {
+    #         "VISUAL": NormalizationMode.IDENTITY,
+    #         "STATE": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for state
+    #         "ACTION": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for action
+    #     }
+    # )
+    
     normalization_mapping: dict[str, NormalizationMode] = field(
         default_factory=lambda: {
             "VISUAL": NormalizationMode.IDENTITY,
-            "STATE": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for state
-            "ACTION": NormalizationMode.QUANTILES,  # Pi0.5 uses quantiles for action
+            "STATE": NormalizationMode.MEAN_STD,  # Pi0.5 uses quantiles for state
+            "ACTION": NormalizationMode.MEAN_STD,  # Pi0.5 uses quantiles for action
         }
     )
 
@@ -82,7 +90,14 @@ class PI05Config(PreTrainedConfig):
     train_expert_only: bool = False  # Freeze entire VLM, train only action expert and projections
 
     # Optimizer settings: see openpi `AdamW`
-    optimizer_lr: float = 2.5e-5  # see openpi `CosineDecaySchedule: peak_lr`
+    # optimizer_lr: float = 2.5e-5  # see openpi `CosineDecaySchedule: peak_lr`
+    # optimizer_betas: tuple[float, float] = (0.9, 0.95)
+    # optimizer_eps: float = 1e-8
+    # optimizer_weight_decay: float = 0.01
+    # optimizer_grad_clip_norm: float = 1.0
+    
+    # align with pi official
+    optimizer_lr: float = 5e-5  # see openpi `CosineDecaySchedule: peak_lr`
     optimizer_betas: tuple[float, float] = (0.9, 0.95)
     optimizer_eps: float = 1e-8
     optimizer_weight_decay: float = 0.01
@@ -91,11 +106,19 @@ class PI05Config(PreTrainedConfig):
     # Scheduler settings: see openpi `CosineDecaySchedule`
     # Note: These will auto-scale if --steps < scheduler_decay_steps
     # For example, --steps=3000 will scale warmup to 100 and decay to 3000
-    scheduler_warmup_steps: int = 1_000
-    scheduler_decay_steps: int = 30_000
-    scheduler_decay_lr: float = 2.5e-6
+    # scheduler_warmup_steps: int = 1_000
+    # scheduler_decay_steps: int = 30_000
+    # scheduler_decay_lr: float = 2.5e-6
+    
+    # align with pi official
+    scheduler_warmup_steps: int = 10_000
+    scheduler_decay_steps: int = 1_000_000
+    scheduler_decay_lr: float = 5e-5
 
     tokenizer_max_length: int = 200  # see openpi `__post_init__`
+    
+    
+    reinit_gemma_expert: bool = False  # Whether to reinitialize gemma_expert weights when finetuning or inference
 
     def __post_init__(self):
         super().__post_init__()

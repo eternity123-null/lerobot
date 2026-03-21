@@ -13,6 +13,11 @@
 # limitations under the License.
 
 ### Environments & Dependencies ###
+
+transformers
+server
+docs/source
+benchmarks
 .env
 .venv
 env/
@@ -177,3 +182,6 @@ outputs/
 *.urdf
 *.xml
 *.part
+
+
+eval

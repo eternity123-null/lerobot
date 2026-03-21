@@ -945,7 +945,7 @@ class PI0FastPolicy(PreTrainedPolicy):
                 print(f"Remapped {remap_count} state dict keys")
 
             # Load the remapped state dict into the model
-            missing_keys, unexpected_keys = model.load_state_dict(remapped_state_dict, strict=strict)
+            missing_keys, unexpected_keys = model.load_state_dict(remapped_state_dict, strict=False)
 
             if missing_keys:
                 print(f"Missing keys when loading state dict: {len(missing_keys)} keys")
@@ -969,6 +969,13 @@ class PI0FastPolicy(PreTrainedPolicy):
 
             if not missing_keys and not unexpected_keys:
                 print("All keys loaded successfully!")
+                
+            if hasattr(config, 'reinit_gemma_expert') and config.reinit_gemma_expert:
+                print("\n" + "="*60)
+                print("Reinitializing gemma_expert weights for finetuning...")
+                model._reinitialize_gemma_expert()
+                print("gemma_expert weights have been randomly reinitialized")
+                print("="*60 + "\n")
 
         except Exception as e:
             print(f"Warning: Could not remap state dict keys: {e}")
@@ -1001,6 +1008,45 @@ class PI0FastPolicy(PreTrainedPolicy):
             fixed_state_dict[new_key] = value
 
         return fixed_state_dict
+    
+    def _reinitialize_gemma_expert(self):
+        """Reinitialize gemma_expert weights to random values.
+        
+        This is useful for finetuning when you want to start with random expert weights
+        while keeping the pretrained vision and language model weights.
+        """
+        print("   Starting gemma_expert reinitialization...")
+        
+        # Reinitialize gemma_expert, preserving each parameter's original dtype
+        for name, param in self.model.paligemma_with_expert.gemma_expert.named_parameters():
+            original_dtype = param.dtype
+            original_device = param.device
+            # Generate random values in float32 first (required by torch), then convert back
+            new_data = torch.randn(param.shape, device=original_device, dtype=torch.float32) * 0.02
+            param.data = new_data.to(dtype=original_dtype)
+        
+        print("   ✓ Reinitialized gemma_expert")
+        
+        # Reinitialize action projection layers, preserving original dtype
+        for module_name, module in [
+            ("action_in_proj", self.model.action_in_proj),
+            ("action_out_proj", self.model.action_out_proj),
+            ("time_mlp_in", self.model.time_mlp_in),
+            ("time_mlp_out", self.model.time_mlp_out),
+        ]:
+            if hasattr(module, 'weight') and module.weight is not None:
+                original_dtype = module.weight.dtype
+                original_device = module.weight.device
+                new_weight = torch.randn(module.weight.shape, device=original_device, dtype=torch.float32) * 0.02
+                module.weight.data = new_weight.to(dtype=original_dtype)
+                print(f"   ✓ Reinitialized {module_name}.weight (dtype: {original_dtype})")
+            if hasattr(module, 'bias') and module.bias is not None:
+                original_dtype = module.bias.dtype
+                original_device = module.bias.device
+                module.bias.data = torch.zeros(module.bias.shape, device=original_device, dtype=original_dtype)
+        
+        print("   Reinitialization complete!")
+
 
     def get_optim_params(self) -> dict:
         return self.parameters()
