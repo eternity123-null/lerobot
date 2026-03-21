@@ -2,7 +2,7 @@
 
 > **文档版本**: v1.0
 > **创建日期**: 2026-03-21
-> **预计完成时间**: 12-15 天
+> **预计完成时间**: 今晚
 
 ---
 
@@ -27,6 +27,7 @@
 2. ✅ 在 LIBERO 环境中进行评估和测试
 3. ✅ 保持 CARP 原有的技术特性（两阶段训练、多尺度自回归）
 4. ✅ 符合 LeRobot 的代码规范和架构模式
+5. 完成关键步骤实现后及时push到当前所在lerobot repo的carp分支上
 
 ---
 
@@ -1214,6 +1215,8 @@ CARP (Coarse-to-Fine Autoregressive Policy) 是一种两阶段的视觉运动策
 # 直接使用
 --dataset.repo_id=your/dataset
 ```
+
+**我已准备好libero的LerobotDataset数据，路径为 "/inspire/hdd/project/robot-decision/public/datasets/HuggingFaceVLA_cus/libero"**
 
 ### 方式 2: 转换现有数据
 
