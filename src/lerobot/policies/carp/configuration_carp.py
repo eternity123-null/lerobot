@@ -183,10 +183,11 @@ class CARPConfig(PreTrainedConfig):
         action_ft = self.output_features.get("action")
         assert action_ft is not None, "action feature is required"
 
-        # Validate observation features
-        has_images = any(k.startswith("observation.images.") for k in self.input_features)
-        has_state = "observation.state" in self.input_features
-        assert has_images or has_state, "Need at least images or state"
+        # For AR stage, validate observation features
+        if self.training_stage == "ar":
+            has_images = any(k.startswith("observation.images.") for k in self.input_features)
+            has_state = "observation.state" in self.input_features
+            assert has_images or has_state, "AR stage needs at least images or state"
 
     @property
     def observation_delta_indices(self) -> None:

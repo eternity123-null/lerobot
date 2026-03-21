@@ -111,7 +111,8 @@ class VectorQuantizer2(nn.Module):
             mean_vq_loss *= 1. / SN
             f_hat = (f_hat.data - f_no_grad).add_(f_BChw) # discard the grad of f_hat when sent into the decoder | in order to optimize the encoder through the reconstruction loss
         # margin = pn*1 / 100 | usages is the utilization percentage of the codebook
-        margin = tdist.get_world_size() * (f_BChw.numel() / f_BChw.shape[1]) / self.vocab_size * 0.08
+        world_size = dist.get_world_size() if dist.initialized() else 1
+        margin = world_size * (f_BChw.numel() / f_BChw.shape[1]) / self.vocab_size * 0.08
         if ret_usages:
             usages = [(self.ema_vocab_hit_SV[si] >= margin).float().mean().item() * 100 for si, pn in enumerate(self.v_patch_nums)] # usage from scale1 to scale4
             usages.append((self.ema_vocab_hit_V >= margin).float().mean().item() * 100) # usage of all
