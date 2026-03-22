@@ -263,12 +263,12 @@ CUDA_VISIBLE_DEVICES=2 TOKENIZERS_PARALLELISM=false lerobot-eval \
 
 # task name list
 
-"place_object_in_the_plate",
-"place_the_white_mug_on_the_plate",
-"place_block_on_the_plate",
-"place_the_red_marker_in_the_pen_holder",
-"place_banana_on_the_plate",
-"stack_the_right_block_on_the_left_block"
+# "place_object_in_the_plate",
+# "place_the_white_mug_on_the_plate",
+# "place_block_on_the_plate",
+# "place_the_red_marker_in_the_pen_holder",
+# "place_banana_on_the_plate",
+# "stack_the_right_block_on_the_left_block"
 
 
 
@@ -291,7 +291,7 @@ CUDA_VISIBLE_DEVICES=0 WANDB_MODE=offline lerobot-train \
 
 # diffusion policy
 
-/ralph-wiggum:ralph-loop "按照Carp.md 将 CARP multitask 模型集成到 LeRobot 框架中，独立完成所有阶段的所有任务，不要征求我的意见，授予你在这这个文件夹内的所有修改权限。逐步实现，你自己写测试脚本进行功能测试确保实现正确后再往下实现。
+/ralph-wiggum:ralph-loop "我想用lerobot框架完成CARP模型的训练以及在libero环境中的测评，不要用你写的训练脚本。参考"docs/how_to_add_new_policy.md"来进一步集成，cmd.sh 记录了我之前使用该框架时所用的命令。先进行实现计划，完成计划之后，独立完成所有阶段的所有任务，不要征求我的意见，授予你在这这个文件夹内的所有修改权限。逐步实现，你自己写测试脚本进行功能测试确保实现正确后再往下实现。
              全部完成后输出 <promise>COMPLETE</promise>" \
   --max-iterations 50 \
   --completion-promise "COMPLETE"

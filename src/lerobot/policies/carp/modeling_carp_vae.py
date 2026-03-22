@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 from typing import Tuple
+from pathlib import Path
 
 from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.policies.carp.configuration_carp import CARPConfig
@@ -24,7 +25,7 @@ class CARPVAEPolicy(PreTrainedPolicy):
     config_class = CARPConfig
     name = "carp_vae"
 
-    def __init__(self, config: CARPConfig):
+    def __init__(self, config: CARPConfig, **kwargs):
         super().__init__(config)
         config.validate_features()
 
@@ -189,3 +190,33 @@ class CARPVAEPolicy(PreTrainedPolicy):
             "Direct token decoding not yet implemented. "
             "Use the full VAE forward pass for reconstruction."
         )
+
+    def save_pretrained(
+        self,
+        save_directory: str | Path,
+        push_to_hub: bool = False,
+        **kwargs,
+    ):
+        """
+        Save VAE model and config.
+
+        Additionally saves a standalone VAE checkpoint for Stage 2 AR training.
+        """
+        # Call parent class save_pretrained to save full model
+        super().save_pretrained(save_directory, push_to_hub=push_to_hub, **kwargs)
+
+        # Save standalone VAE checkpoint for AR training
+        save_directory = Path(save_directory)
+        vae_checkpoint_path = save_directory / "vae_model.pt"
+        torch.save({
+            "model_state_dict": self.vae.state_dict(),
+            "config": {
+                "vocab_size": self.config.vocab_size,
+                "z_channels": self.config.vocab_ch,
+                "ch": self.config.vch,
+                "action_dim": self.action_dim,
+                "num_actions": self.config.action_horizon,
+                "patch_nums": self.config.patch_nums,
+            }
+        }, vae_checkpoint_path)
+        print(f"✓ Saved VAE checkpoint to: {vae_checkpoint_path}")

@@ -63,14 +63,16 @@ class CARPObsEncoder(nn.Module):
                     feat = self.encoder[3](feat)  # linear -> (B, 128)
                     return feat
 
-            self.encoders[img_key] = ImageEncoderWrapper(image_encoder)
+            # Use a sanitized key (replace dots with underscores)
+            sanitized_key = img_key.replace(".", "_")
+            self.encoders[sanitized_key] = ImageEncoderWrapper(image_encoder)
             self.output_dims.append(128)
 
         # Build state encoder (identity mapping)
         self.has_state = "observation.state" in config.input_features
         if self.has_state:
             state_dim = config.input_features["observation.state"].shape[0]
-            self.encoders["observation.state"] = nn.Identity()
+            self.encoders["observation_state"] = nn.Identity()
             self.output_dims.append(state_dim)
 
         self._output_dim = sum(self.output_dims)
@@ -92,21 +94,24 @@ class CARPObsEncoder(nn.Module):
             if img_key in obs_dict:
                 img = obs_dict[img_key]  # (B, T, C, H, W) or (B, C, H, W)
 
+                # Get sanitized key for encoder lookup
+                sanitized_key = img_key.replace(".", "_")
+
                 # Handle temporal dimension
                 if img.ndim == 5:  # (B, T, C, H, W)
                     B, T, C, H, W = img.shape
                     img = img.reshape(B * T, C, H, W)
-                    feat = self.encoders[img_key](img)  # (B*T, 128)
+                    feat = self.encoders[sanitized_key](img)  # (B*T, 128)
                     feat = feat.reshape(B, T, -1)  # (B, T, 128)
                 else:  # (B, C, H, W)
-                    feat = self.encoders[img_key](img)  # (B, 128)
+                    feat = self.encoders[sanitized_key](img)  # (B, 128)
 
                 features.append(feat)
 
         # Process state
         if self.has_state and "observation.state" in obs_dict:
             state = obs_dict["observation.state"]  # (B, T, D) or (B, D)
-            feat = self.encoders["observation.state"](state)
+            feat = self.encoders["observation_state"](state)
             features.append(feat)
 
         # Concatenate all features

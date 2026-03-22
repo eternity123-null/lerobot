@@ -14,6 +14,7 @@
 
 from .act.configuration_act import ACTConfig as ACTConfig
 from .carp.configuration_carp import CARPConfig as CARPConfig
+from .carp.configuration_carp import CARPVAEConfig as CARPVAEConfig
 from .diffusion.configuration_diffusion import DiffusionConfig as DiffusionConfig
 from .groot.configuration_groot import GrootConfig as GrootConfig
 from .pi0.configuration_pi0 import PI0Config as PI0Config
@@ -29,6 +30,7 @@ from .xvla.configuration_xvla import XVLAConfig as XVLAConfig
 __all__ = [
     "ACTConfig",
     "CARPConfig",
+    "CARPVAEConfig",
     "DiffusionConfig",
     "PI0Config",
     "PI05Config",

@@ -29,7 +29,7 @@ class CARPPolicy(PreTrainedPolicy):
     config_class = CARPConfig
     name = "carp"
 
-    def __init__(self, config: CARPConfig):
+    def __init__(self, config: CARPConfig, **kwargs):
         super().__init__(config)
         config.validate_features()
 
@@ -140,8 +140,8 @@ class CARPPolicy(PreTrainedPolicy):
 
         Args:
             batch: {
-                "observation.images.*": (B, n_obs_steps, C, H, W),
-                "observation.state": (B, n_obs_steps, D),
+                "observation.images.*": (B, n_obs_steps, C, H, W) or (B, C, H, W),
+                "observation.state": (B, n_obs_steps, D) or (B, D),
                 "action": (B, action_horizon, action_dim),
                 "task_id": (B,) - optional, defaults to 0
             }
@@ -166,22 +166,42 @@ class CARPPolicy(PreTrainedPolicy):
         B = actions.shape[0]
 
         with torch.no_grad():
-            # Encode actions to multi-scale tokens
-            actions_per_dim = actions.transpose(1, 2).unsqueeze(-1)  # (B, A, T, 1)
-            latent = self.vae.encoder(actions_per_dim)
-            latent = self.vae.quant_conv(latent)
-            gt_token_indices = self.vae.quantize.f_to_idxBl_or_fhat(
-                latent,
-                to_fhat=False,
+            # Encode actions to multi-scale tokens using VAE
+            # VAE expects (B, 1, T, A) format
+            actions_vae_format = actions.unsqueeze(1)  # (B, 1, T, A)
+
+            # Use inp_to_idxBl to get token indices
+            gt_token_indices_per_dim = self.vae.inp_to_idxBl(
+                actions_vae_format,
                 v_patch_nums=self.config.patch_nums
-            )  # List of [B, pn*1] for each scale
+            )  # List[action_dim] of List[scales] of [B, pn*1]
+
+            # Combine indices across action dimensions and scales into a single sequence
+            # Structure: [scale1_dim1, scale1_dim2, ..., scale2_dim1, scale2_dim2, ...]
+            all_indices = []
+            scale_boundaries = [0]  # Track where each scale starts/ends
+
+            for scale_idx in range(len(self.config.patch_nums)):
+                for dim_idx in range(self.action_dim):
+                    all_indices.append(gt_token_indices_per_dim[dim_idx][scale_idx])
+                scale_boundaries.append(scale_boundaries[-1] + self.config.patch_nums[scale_idx] * self.action_dim)
+
+            # Concatenate all indices into a single sequence
+            gt_indices_BL = torch.cat(all_indices, dim=1)  # (B, L) where L = sum(pn*action_dim)
+
+            # Convert indices to embeddings using VAE
+            gt_embeddings_BLCv = self.vae.idxBl_to_embeddings(gt_indices_BL)  # (B, L, Cvae)
+
+            # Remove first layer for teacher forcing (AR model generates first layer from obs)
+            first_l = self.config.patch_nums[0] * self.action_dim
+            x_BLCv_wo_first_l = gt_embeddings_BLCv[:, first_l:, :]  # (B, L-first_l, Cvae)
 
         # Forward through AR model with teacher forcing
-        logits_list = self.ar_model(
-            obs_dict=obs_dict,
-            task_ids=task_ids,
-            gt_indices=gt_token_indices if self.training else None,
-        )  # List of [B, pn*1, vocab_size] for each scale
+        logits_BLV = self.ar_model(
+            nobs=obs_dict,
+            x_BLCv_wo_first_l=x_BLCv_wo_first_l,
+            ntasks=task_ids,
+        )  # (B, L, V)
 
         # Compute cross-entropy loss for each scale
         total_loss = 0.0
@@ -189,12 +209,18 @@ class CARPPolicy(PreTrainedPolicy):
         total_tokens = 0
         scale_losses = []
 
-        for scale_idx, (logits, gt_indices) in enumerate(zip(logits_list, gt_token_indices)):
-            # logits: (B, num_patches, vocab_size)
-            # gt_indices: (B, num_patches)
+        for scale_idx in range(len(self.config.patch_nums)):
+            # Get indices for this scale
+            start_idx = scale_boundaries[scale_idx]
+            end_idx = scale_boundaries[scale_idx + 1]
 
-            logits_flat = logits.reshape(-1, self.config.vocab_size)  # (B*num_patches, V)
-            gt_flat = gt_indices.reshape(-1)  # (B*num_patches,)
+            # Extract logits and ground truth for this scale
+            scale_logits = logits_BLV[:, start_idx:end_idx, :]  # (B, pn*action_dim, V)
+            scale_gt_indices = gt_indices_BL[:, start_idx:end_idx]  # (B, pn*action_dim)
+
+            # Flatten for cross-entropy
+            logits_flat = scale_logits.reshape(-1, self.config.vocab_size)
+            gt_flat = scale_gt_indices.reshape(-1)
 
             # Cross-entropy loss with optional label smoothing
             scale_loss = F.cross_entropy(
@@ -213,7 +239,7 @@ class CARPPolicy(PreTrainedPolicy):
             total_tokens += gt_flat.numel()
 
         # Average loss across scales
-        total_loss = total_loss / len(logits_list)
+        total_loss = total_loss / len(self.config.patch_nums)
         accuracy = total_correct / total_tokens if total_tokens > 0 else 0.0
 
         loss_dict = {
@@ -253,19 +279,12 @@ class CARPPolicy(PreTrainedPolicy):
         # Extract task IDs
         task_ids = batch.get("task_id", torch.zeros(1, dtype=torch.long, device=self.config.device))
 
-        # Autoregressive generation (no teacher forcing)
-        logits_list = self.ar_model(
-            obs_dict=obs_dict,
-            task_ids=task_ids,
-            gt_indices=None,  # Autoregressive mode
-        )
-
-        # Convert logits to token indices (greedy sampling)
-        pred_token_indices = [logits.argmax(dim=-1) for logits in logits_list]
-        # Each: (B, num_patches)
-
-        # Decode tokens to actions using frozen VAE decoder
-        actions = self._decode_tokens_to_actions(pred_token_indices)
+        # Autoregressive generation using the AR model's inference method
+        actions = self.ar_model.autoregressive_infer_cfg(
+            nobs=obs_dict,
+            vae_proxy=self.vae,
+            ntasks=task_ids,
+        )  # Returns (B, action_horizon, action_dim) directly
 
         return actions
 

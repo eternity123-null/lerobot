@@ -151,7 +151,7 @@ class CARPConfig(PreTrainedConfig):
 
     def get_scheduler_preset(self) -> LRSchedulerConfig | None:
         """Return learning rate scheduler config based on training stage."""
-        from lerobot.optim.schedulers import CosineAnnealingLRConfig, LinearLRConfig
+        from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
 
         if self.training_stage == "vae":
             schedule = self.vae_lr_schedule
@@ -161,16 +161,11 @@ class CARPConfig(PreTrainedConfig):
             warmup = self.ar_warmup_ratio
 
         if schedule == "cos":
-            return CosineAnnealingLRConfig(
-                T_max=1000,  # Will be overridden by training script
-                eta_min=0.0,
-                warmup_steps=warmup,
-            )
-        elif schedule in ["lin", "lin0"]:
-            return LinearLRConfig(
-                start_factor=1.0,
-                end_factor=0.1 if schedule == "lin" else 0.0,
-                warmup_steps=warmup,
+            return CosineDecayWithWarmupSchedulerConfig(
+                num_warmup_steps=warmup,
+                num_decay_steps=10000,
+                peak_lr=0.0001,
+                decay_lr=0.00001,
             )
         return None
 
@@ -195,11 +190,28 @@ class CARPConfig(PreTrainedConfig):
         return None
 
     @property
-    def action_delta_indices(self) -> list[list[int]]:
-        """CARP uses delta actions."""
-        return [[0, self.action_horizon]]
+    def action_delta_indices(self) -> list[int]:
+        """CARP uses delta actions - returns indices for action_horizon steps."""
+        return list(range(self.action_horizon))
 
     @property
     def reward_delta_indices(self) -> None:
         """CARP does not use delta rewards."""
         return None
+
+
+@PreTrainedConfig.register_subclass("carp_vae")
+@dataclass
+class CARPVAEConfig(CARPConfig):
+    """
+    Configuration class for CARP VAE (Stage 1: Multi-Scale Action Tokenization).
+
+    This is a simplified config that forces training_stage="vae" and removes AR-specific params.
+    """
+
+    training_stage: str = "vae"  # Fixed to VAE stage
+
+    def __post_init__(self):
+        super().__post_init__()
+        # Force VAE stage
+        self.training_stage = "vae"
