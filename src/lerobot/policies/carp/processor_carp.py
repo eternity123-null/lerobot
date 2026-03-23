@@ -72,9 +72,8 @@ def make_carp_pre_post_processors(
     input_steps.append(CARPTaskIDProcessorStep())
 
     # Step 2: Rename observations (if needed for other fields)
-    rename_map = {}  # Can be customized based on robot/env naming conventions
-    if rename_map:
-        input_steps.append(RenameObservationsProcessorStep(rename_map=rename_map))
+    # Always include this step (even with empty rename_map) for eval compatibility
+    input_steps.append(RenameObservationsProcessorStep(rename_map={}))
 
     # Step 3: Add batch dimension (for single samples)
     input_steps.append(AddBatchDimensionProcessorStep())

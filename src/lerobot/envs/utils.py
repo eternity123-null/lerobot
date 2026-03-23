@@ -107,6 +107,15 @@ def preprocess_observation(observations: dict[str, np.ndarray]) -> dict[str, Ten
     if "camera_obs" in observations:
         return_observations[f"{OBS_STR}.camera_obs"] = observations["camera_obs"]
 
+    # Handle task_id (for multi-task policies like CARP)
+    if "task_id" in observations:
+        task_id = observations["task_id"]
+        if isinstance(task_id, np.ndarray):
+            task_id = torch.from_numpy(task_id).long()
+        elif not isinstance(task_id, torch.Tensor):
+            task_id = torch.tensor(task_id, dtype=torch.long)
+        return_observations["task_id"] = task_id
+
     return return_observations
 
 
@@ -183,20 +192,56 @@ def add_envs_task(env: gym.vector.VectorEnv, observation: RobotObservation) -> R
         num_envs = observation[list(observation.keys())[0]].shape[0]
         observation["task"] = ["" for _ in range(num_envs)]
 
-    # Add task_id if available (for multi-task policies like CARP)
-    # LIBERO and other multi-task envs expose task_id as an attribute
+    # Add task_id for multi-task policies (e.g., CARP)
+    # For LIBERO: map task description to dataset task_index
     if hasattr(env.envs[0], "task_id"):
-        task_id_result = env.call("task_id")
+        # Check if this is a LIBERO environment (has task_description)
+        if hasattr(env.envs[0], "task_description"):
+            from lerobot.envs.libero_task_mapping import get_task_index_from_description
 
-        if isinstance(task_id_result, tuple):
-            task_id_result = list(task_id_result)
+            # Get task descriptions from all environments
+            task_descriptions = env.call("task_description")
+            if isinstance(task_descriptions, tuple):
+                task_descriptions = list(task_descriptions)
 
-        if not isinstance(task_id_result, list):
-            raise TypeError(f"Expected task_id to return a list, got {type(task_id_result)}")
+            # Map each task description to dataset task_index
+            task_indices = []
+            for task_desc in task_descriptions:
+                task_idx = get_task_index_from_description(task_desc)
+                if task_idx is None:
+                    # Fallback: use environment's per-suite task_id
+                    # This should not happen with the complete mapping
+                    import warnings
 
-        # Convert to numpy array for consistency
-        import numpy as np
-        observation["task_id"] = np.array(task_id_result, dtype=np.int64)
+                    warnings.warn(
+                        f"Task description not found in mapping: '{task_desc}'. "
+                        f"Using environment task_id as fallback."
+                    )
+                    task_id_result = env.call("task_id")
+                    if isinstance(task_id_result, tuple):
+                        task_id_result = list(task_id_result)
+                    task_indices = task_id_result
+                    break
+                task_indices.append(task_idx)
+
+            # Convert to numpy array for consistency
+            import numpy as np
+
+            observation["task_id"] = np.array(task_indices, dtype=np.int64)
+        else:
+            # Non-LIBERO environment: use environment's task_id directly
+            task_id_result = env.call("task_id")
+
+            if isinstance(task_id_result, tuple):
+                task_id_result = list(task_id_result)
+
+            if not isinstance(task_id_result, list):
+                raise TypeError(f"Expected task_id to return a list, got {type(task_id_result)}")
+
+            # Convert to numpy array for consistency
+            import numpy as np
+
+            observation["task_id"] = np.array(task_id_result, dtype=np.int64)
 
     return observation
 

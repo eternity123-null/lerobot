@@ -277,14 +277,20 @@ class CARPPolicy(PreTrainedPolicy):
         obs_dict = {k: v for k, v in batch.items() if k.startswith("observation.")}
 
         # Extract task IDs
-        task_ids = batch.get("task_id", torch.zeros(1, dtype=torch.long, device=self.config.device))
+        raw_task_ids = batch.get("task_id", torch.zeros(1, dtype=torch.long, device=self.config.device))
+        task_ids = torch.as_tensor(raw_task_ids, dtype=torch.long, device=self.config.device)
 
         # Autoregressive generation using the AR model's inference method
         actions = self.ar_model.autoregressive_infer_cfg(
             nobs=obs_dict,
             vae_proxy=self.vae,
             ntasks=task_ids,
-        )  # Returns (B, action_horizon, action_dim) directly
+        )  # Returns (B, 1, action_horizon, action_dim) from VAE
+
+        # Remove the extra dimension (dimension 1)
+        # VAE's fhat_to_action returns [B, 1, action_horizon, action_dim]
+        # We need [B, action_horizon, action_dim]
+        actions = actions.squeeze(1)  # (B, action_horizon, action_dim)
 
         return actions
 
@@ -355,18 +361,19 @@ class CARPPolicy(PreTrainedPolicy):
             batch: Observation batch (same as predict_action_chunk)
 
         Returns:
-            action: (action_dim,) - single action to execute
+            action: (batch_size, action_dim) - single action to execute
         """
         self.eval()
 
         # If action queue is empty, generate a new chunk
         if len(self._action_queue) == 0:
-            action_chunk = self.predict_action_chunk(batch)  # (1, horizon, action_dim)
-            action_chunk = action_chunk.squeeze(0)  # (horizon, action_dim)
+            action_chunk = self.predict_action_chunk(batch)  # (B, action_horizon, action_dim)
+            # Use the full action_horizon for execution
+            action_chunk = action_chunk[:, :self.config.action_horizon, :]  # (B, action_horizon, action_dim)
 
-            # Add all actions to queue
-            for action in action_chunk:
-                self._action_queue.append(action)
+            # Transpose to (action_horizon, B, action_dim) to preserve batch dimension
+            # when storing in queue
+            self._action_queue.extend(action_chunk.transpose(0, 1))
 
-        # Pop and return the next action
-        return self._action_queue.popleft()
+        # Pop and return the next action with batch dimension preserved
+        return self._action_queue.popleft()  # (batch_size, action_dim)

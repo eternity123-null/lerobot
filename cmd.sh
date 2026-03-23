@@ -349,13 +349,11 @@ WANDB_MODE=offline TOKENIZERS_PARALLELISM=false accelerate launch \
 
 CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
   --env.type=libero \
-  --env.task=libero_spatial,libero_object,libero_goal,libero_10 \
+  --env.task=libero_spatial \
   --eval.batch_size=1 \
   --eval.n_episodes=5 \
-  --policy.path=outputs/carp_ar_libero_0322/checkpoints/030000/pretrained_model \
-  --policy.n_obs_steps=1 \
-  --policy.task_num=40 \
-  --output_dir=./eval/carp_libero_0322_30000/ \
+  --policy.path=outputs/pi05_libero_finetune/checkpoints/015000/pretrained_model \
+  --output_dir=./eval/pi05_test/ \
   --env.max_parallel_tasks=1
 
 CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
@@ -368,3 +366,40 @@ CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
   --policy.task_num=40 \
   --output_dir=./eval/carp_libero_0322_30000/ \
   --env.max_parallel_tasks=1
+
+CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
+  --env.type=libero \
+  --env.task=libero_spatial \
+  --eval.batch_size=1 \
+  --eval.n_episodes=5 \
+  --policy.path=outputs/carp_ar_libero_test1/checkpoints/000100/pretrained_model \
+  --policy.n_obs_steps=1 \
+  --policy.task_num=40 \
+  --output_dir=./eval/carp_ar_libero_test1/ \
+  --env.max_parallel_tasks=1
+
+
+
+WANDB_MODE=offline TOKENIZERS_PARALLELISM=false accelerate launch \
+  --multi_gpu \
+  --num_processes=8 \
+  $(which lerobot-train) \
+  --dataset.repo_id=libero \
+  --dataset.root=/inspire/hdd/project/robot-decision/public/datasets/HuggingFaceVLA_cus/libero \
+  --policy.type=carp \
+  --policy.vae_checkpoint_path="outputs/carp_vae_libero0322_new/checkpoints/010000/pretrained_model/vae_model.pt" \
+  --output_dir=./outputs/carp_ar_libero_test1 \
+  --job_name=carp_ar_libero_test \
+  --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --policy.n_obs_steps=1 \
+  --policy.task_num=40 \
+  --steps=100 \
+  --batch_size=256 \
+  --save_freq=100 \
+  --eval_freq=5000 \
+  --log_freq=100 \
+  --num_workers=16 \
+  --wandb.enable=true \
+  --wandb.project=carp_libero \
+  --wandb.mode=offline

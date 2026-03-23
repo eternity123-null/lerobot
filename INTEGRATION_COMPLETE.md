@@ -235,3 +235,25 @@ CARP 模型已经**完全集成**到 LeRobot 框架中：
 **集成完成时间**: 2026-03-22
 **LeRobot 版本**: latest
 **CARP 论文**: [CARP: Coarse-to-Fine Autoregressive Policy]
+
+
+
+**目前仍存在的两个问题**
+1. eval时环境给的task_id 和数据集中的task_id不一样，eval中每个test suite(如libero_spatial)，task_id都是0~9. 你可能需要把dataset的task的text拿出来，在eval时用字符串匹配来确认相应的task_id
+2. 目前的代码运行lerobot-eval时会出现以下报错：
+    [init_weights] Coarse2FineAutoRegressor with init_std=0.0456435                                                                                                         │[5] 
+    Loading weights from local directory                                                                                                                                    │     0 / 
+    Traceback (most recent call last):                                                                                                                                      │[6] 
+      File "/inspire/ssd/project/robot-decision/cengchendong-CZXS25230112/Projects/lerobot/src/lerobot/processor/pipeline.py", line 835, in _resolve_step_class             │     0 / 
+        step_class = ProcessorStepRegistry.get(step_entry["registry_name"])                                                                                                 │[7] 
+      File "/inspire/ssd/project/robot-decision/cengchendong-CZXS25230112/Projects/lerobot/src/lerobot/processor/pipeline.py", line 116, in get                             │     0 / 
+        raise KeyError(                                                                                                                                                     │
+    KeyError: "Processor step 'carp_task_id' not found in registry. Available steps: ['to_batch_processor_action', 'to_batch_processor_observation', 'to_batch_processor_com│
+    plementary_data', 'to_batch_processor', 'map_tensor_to_delta_action_dict', 'map_delta_action_to_robot_action', 'device_processor', 'torch2numpy_action_processor', 'nump│
+    y2torch_action_processor', 'add_teleop_action_as_complementary_data', 'add_teleop_action_as_info', 'image_crop_resize_processor', 'time_limit_processor', 'gripper_penal│
+    ty_processor', 'intervention_action_processor', 'reward_classifier_processor', 'normalizer_processor', 'unnormalizer_processor', 'observation_processor', 'robot_action_│
+    to_policy_action_processor', 'policy_action_to_robot_action_processor', 'rename_observations_processor', 'tokenizer_processor', 'action_tokenizer_processor', 'groot_pac│
+    k_inputs_v3', 'groot_eagle_encode_v3', 'groot_eagle_collate_v3', 'groot_action_unpack_unnormalize_v1', 'pi0_new_line_processor', 'pi0_fast_prepare_state_tokenizer_proce│
+    ssor_step', 'pi05_prepare_state_tokenizer_processor_step', 'smolvla_new_line_processor', 'xvla_image_scale', 'xvla_image_to_float', 'xvla_imagenet_normalize', 'xvla_add│
+    _domain_id', 'xvla_rotation_6d_to_axis_angle', 'libero_processor', 'isaaclab_arena_processor']. Make sure the step is registered using @ProcessorStepRegistry.register()│
+    "                                                                                                                                             

@@ -186,6 +186,8 @@ def rollout(
         assert action_numpy.ndim == 2, "Action dimensions should be (batch, action_dim)"
 
         # Apply the next action.
+        
+        
         observation, reward, terminated, truncated, info = env.step(action_numpy)
         if render_callback is not None:
             render_callback(env)
