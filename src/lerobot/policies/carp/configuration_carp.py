@@ -84,6 +84,7 @@ class CARPConfig(PreTrainedConfig):
     # ============ General configuration ============
     n_obs_steps: int = 1
     action_horizon: int = 16
+    n_action_steps: int = 16 # Number of action steps to execute (can be <= action_horizon)
 
     # ============ MSAT (VQ-VAE) configuration ============
     vocab_size: int = 1024  # Codebook size (original CARP uses 1024)

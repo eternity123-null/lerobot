@@ -346,19 +346,11 @@ WANDB_MODE=offline TOKENIZERS_PARALLELISM=false accelerate launch \
   --wandb.project=carp_libero \
   --wandb.mode=offline
 
+# libero_spatial,libero_object,libero_goal,libero_10
 
-CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
+MUJOCO_GL=egl CUDA_VISIBLE_DEVICES=3 TOKENIZERS_PARALLELISM=false lerobot-eval \
   --env.type=libero \
-  --env.task=libero_spatial \
-  --eval.batch_size=1 \
-  --eval.n_episodes=5 \
-  --policy.path=outputs/pi05_libero_finetune/checkpoints/015000/pretrained_model \
-  --output_dir=./eval/pi05_test/ \
-  --env.max_parallel_tasks=1
-
-CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
-  --env.type=libero \
-  --env.task=libero_spatial,libero_object \
+  --env.task=libero_10 \
   --eval.batch_size=1 \
   --eval.n_episodes=5 \
   --policy.path=outputs/carp_ar_libero_0322/checkpoints/030000/pretrained_model \

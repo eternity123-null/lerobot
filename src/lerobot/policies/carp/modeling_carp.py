@@ -369,9 +369,9 @@ class CARPPolicy(PreTrainedPolicy):
         if len(self._action_queue) == 0:
             action_chunk = self.predict_action_chunk(batch)  # (B, action_horizon, action_dim)
             # Use the full action_horizon for execution
-            action_chunk = action_chunk[:, :self.config.action_horizon, :]  # (B, action_horizon, action_dim)
+            action_chunk = action_chunk[:, :self.config.n_action_steps, :]  # (B, n_action_steps, action_dim)
 
-            # Transpose to (action_horizon, B, action_dim) to preserve batch dimension
+            # Transpose to (n_action_steps, B, action_dim) to preserve batch dimension
             # when storing in queue
             self._action_queue.extend(action_chunk.transpose(0, 1))
 
