@@ -182,6 +182,22 @@ def add_envs_task(env: gym.vector.VectorEnv, observation: RobotObservation) -> R
     else:  #  For envs without language instructions, e.g. aloha transfer cube and etc.
         num_envs = observation[list(observation.keys())[0]].shape[0]
         observation["task"] = ["" for _ in range(num_envs)]
+
+    # Add task_id if available (for multi-task policies like CARP)
+    # LIBERO and other multi-task envs expose task_id as an attribute
+    if hasattr(env.envs[0], "task_id"):
+        task_id_result = env.call("task_id")
+
+        if isinstance(task_id_result, tuple):
+            task_id_result = list(task_id_result)
+
+        if not isinstance(task_id_result, list):
+            raise TypeError(f"Expected task_id to return a list, got {type(task_id_result)}")
+
+        # Convert to numpy array for consistency
+        import numpy as np
+        observation["task_id"] = np.array(task_id_result, dtype=np.int64)
+
     return observation
 
 

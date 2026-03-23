@@ -11,6 +11,7 @@ from lerobot.policies.carp.carp_processor_steps import (
     CARPSampleActionSequenceStep,
     CARPAddTemporalDimensionStep,
 )
+from lerobot.policies.carp.carp_task_id_step import CARPTaskIDProcessorStep
 from lerobot.processor import (
     AddBatchDimensionProcessorStep,
     DeviceProcessorStep,
@@ -42,12 +43,13 @@ def make_carp_pre_post_processors(
     Create preprocessor and postprocessor pipelines for CARP policy.
 
     Preprocessor (Robot/Env → Policy):
-        1. RenameObservations - ensure consistent naming
-        2. AddBatchDimension - add batch dim if needed
-        3. Normalizer - normalize observations and actions
-        4. SampleActionSequence - sample action_horizon steps (for training)
-        5. AddTemporalDimension - add time dimension to observations
-        6. Device - move to GPU/CPU
+        1. TaskID - rename task_index to task_id (for LIBERO dataset)
+        2. RenameObservations - ensure consistent naming (optional)
+        3. AddBatchDimension - add batch dim if needed
+        4. Normalizer - normalize observations and actions
+        5. SampleActionSequence - sample action_horizon steps (for training)
+        6. AddTemporalDimension - add time dimension to observations
+        7. Device - move to GPU/CPU
 
     Postprocessor (Policy → Robot/Env):
         1. Unnormalizer - denormalize actions
@@ -64,15 +66,20 @@ def make_carp_pre_post_processors(
     # ========== Preprocessor ==========
     input_steps = []
 
-    # Step 1: Rename observations (if needed)
+    # Step 1: Handle task ID (rename task_index → task_id)
+    # IMPORTANT: CARP needs task_id for multi-task conditioning
+    # LIBERO dataset provides "task_index", CARP model expects "task_id"
+    input_steps.append(CARPTaskIDProcessorStep())
+
+    # Step 2: Rename observations (if needed for other fields)
     rename_map = {}  # Can be customized based on robot/env naming conventions
     if rename_map:
         input_steps.append(RenameObservationsProcessorStep(rename_map=rename_map))
 
-    # Step 2: Add batch dimension (for single samples)
+    # Step 3: Add batch dimension (for single samples)
     input_steps.append(AddBatchDimensionProcessorStep())
 
-    # Step 3: Normalize observations and actions
+    # Step 4: Normalize observations and actions
     # IMPORTANT: This must come before any tokenizer steps (for VLA models)
     if dataset_stats is not None:
         input_steps.append(
@@ -83,20 +90,20 @@ def make_carp_pre_post_processors(
             )
         )
 
-    # Step 4: Sample action sequences (for training)
+    # Step 5: Sample action sequences (for training)
     # Convert action: (B, A) -> (B, action_horizon, A)
     input_steps.append(
         CARPSampleActionSequenceStep(action_horizon=config.action_horizon)
     )
 
-    # Step 5: Add temporal dimension to observations
+    # Step 6: Add temporal dimension to observations
     # Convert obs: (B, ...) -> (B, n_obs_steps, ...)
     # ALWAYS add this step, even if n_obs_steps=1, because AR model expects it
     input_steps.append(
         CARPAddTemporalDimensionStep(n_obs_steps=config.n_obs_steps)
     )
 
-    # Step 6: Move to target device
+    # Step 7: Move to target device
     input_steps.append(DeviceProcessorStep(device=config.device))
 
     # ========== Postprocessor ==========

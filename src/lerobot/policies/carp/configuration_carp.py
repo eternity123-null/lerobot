@@ -86,7 +86,7 @@ class CARPConfig(PreTrainedConfig):
     action_horizon: int = 16
 
     # ============ MSAT (VQ-VAE) configuration ============
-    vocab_size: int = 512
+    vocab_size: int = 1024  # Codebook size (original CARP uses 1024)
     vocab_ch: int = 8
     vch: int = 2
     ch_mult: tuple[int, ...] = (2, 4)
@@ -118,7 +118,7 @@ class CARPConfig(PreTrainedConfig):
     patch_size: int = 1
 
     # ============ Multi-task configuration ============
-    task_num: int = 8
+    task_num: int = 40
     task_embed_dim: int = 3
 
     # ============ Training stage control ============

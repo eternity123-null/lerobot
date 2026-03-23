@@ -295,3 +295,76 @@ CUDA_VISIBLE_DEVICES=0 WANDB_MODE=offline lerobot-train \
              全部完成后输出 <promise>COMPLETE</promise>" \
   --max-iterations 50 \
   --completion-promise "COMPLETE"
+
+
+# carp
+
+WANDB_MODE=offline TOKENIZERS_PARALLELISM=false accelerate launch \
+  --multi_gpu \
+  --num_processes=8 \
+  $(which lerobot-train) \
+  --dataset.repo_id=libero \
+  --dataset.root=/inspire/ssd/project/robot-decision/cengchendong-CZXS25230112/tmpdataset/libero \
+  --policy.type=carp_vae \
+  --output_dir=./outputs/carp_vae_libero0322_new \
+  --job_name=carp_vae_libero_multigpu \
+  --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --policy.vocab_size=1024 \
+  --steps=20000 \
+  --batch_size=512 \
+  --save_freq=5000 \
+  --eval_freq=5000 \
+  --log_freq=100 \
+  --num_workers=16 \
+  --wandb.enable=true \
+  --wandb.project=carp_libero \
+  --wandb.mode=offline
+
+
+WANDB_MODE=offline TOKENIZERS_PARALLELISM=false accelerate launch \
+  --multi_gpu \
+  --num_processes=8 \
+  $(which lerobot-train) \
+  --dataset.repo_id=libero \
+  --dataset.root=/inspire/hdd/project/robot-decision/public/datasets/HuggingFaceVLA_cus/libero \
+  --policy.type=carp \
+  --policy.vae_checkpoint_path="outputs/carp_vae_libero0322_new/checkpoints/010000/pretrained_model/vae_model.pt" \
+  --output_dir=./outputs/carp_ar_libero_0322 \
+  --job_name=carp_ar_libero_0322 \
+  --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --policy.n_obs_steps=1 \
+  --policy.task_num=40 \
+  --steps=30001 \
+  --batch_size=256 \
+  --save_freq=5000 \
+  --eval_freq=5000 \
+  --log_freq=100 \
+  --num_workers=16 \
+  --wandb.enable=true \
+  --wandb.project=carp_libero \
+  --wandb.mode=offline
+
+
+CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
+  --env.type=libero \
+  --env.task=libero_spatial,libero_object,libero_goal,libero_10 \
+  --eval.batch_size=1 \
+  --eval.n_episodes=5 \
+  --policy.path=outputs/carp_ar_libero_0322/checkpoints/030000/pretrained_model \
+  --policy.n_obs_steps=1 \
+  --policy.task_num=40 \
+  --output_dir=./eval/carp_libero_0322_30000/ \
+  --env.max_parallel_tasks=1
+
+CUDA_VISIBLE_DEVICES=0 TOKENIZERS_PARALLELISM=false lerobot-eval \
+  --env.type=libero \
+  --env.task=libero_spatial,libero_object \
+  --eval.batch_size=1 \
+  --eval.n_episodes=5 \
+  --policy.path=outputs/carp_ar_libero_0322/checkpoints/030000/pretrained_model \
+  --policy.n_obs_steps=1 \
+  --policy.task_num=40 \
+  --output_dir=./eval/carp_libero_0322_30000/ \
+  --env.max_parallel_tasks=1

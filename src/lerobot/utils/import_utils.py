@@ -150,7 +150,7 @@ def register_third_party_plugins() -> None:
             imported.append(module_name)
             logging.info("Imported third-party plugin: %s", module_name)
         except Exception:
-            logging.exception("Could not import third-party plugin: %s", module_name)
+            # logging.exception("Could not import third-party plugin: %s", module_name)
             failed.append(module_name)
 
     for dist in importlib.metadata.distributions():
